@@ -1,21 +1,20 @@
-
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 from config import Config
 from models import db, Patient
-from validation import (
-    validate_patient_data,
-    GENDERS,
-    WARDS,
-    DEPARTMENTS,
-    DOCTORS
-)
+from validation import validate_patient_data, GENDERS, WARDS, DEPARTMENTS, DOCTORS
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
-CORS(app)
+CORS(
+    app,
+    resources={
+        r"/api/*": {"origins": os.getenv("FRONTEND_URL", "http://localhost:5173")}
+    },
+)
 db.init_app(app)
 
 with app.app_context():
@@ -24,9 +23,7 @@ with app.app_context():
 
 @app.route("/", methods=["GET"])
 def home():
-    return jsonify({
-        "message": "Patient Admission Management API is running"
-    })
+    return jsonify({"message": "Patient Admission Management API is running"})
 
 
 @app.route("/api/health", methods=["GET"])
@@ -37,12 +34,14 @@ def health():
 # Dropdown options for frontend
 @app.route("/api/options", methods=["GET"])
 def get_options():
-    return jsonify({
-        "genders": GENDERS,
-        "wards": WARDS,
-        "departments": DEPARTMENTS,
-        "doctors": DOCTORS
-    })
+    return jsonify(
+        {
+            "genders": GENDERS,
+            "wards": WARDS,
+            "departments": DEPARTMENTS,
+            "doctors": DOCTORS,
+        }
+    )
 
 
 # Add a patient
@@ -53,10 +52,7 @@ def add_patient():
     cleaned, errors = validate_patient_data(data)
 
     if errors:
-        return jsonify({
-            "message": "Validation failed",
-            "errors": errors
-        }), 400
+        return jsonify({"message": "Validation failed", "errors": errors}), 400
 
     patient = Patient(**cleaned)
 
@@ -64,16 +60,16 @@ def add_patient():
         db.session.add(patient)
         db.session.commit()
 
-        return jsonify({
-            "message": "Patient added successfully",
-            "patient": patient.to_dict()
-        }), 201
+        return (
+            jsonify(
+                {"message": "Patient added successfully", "patient": patient.to_dict()}
+            ),
+            201,
+        )
 
     except Exception:
         db.session.rollback()
-        return jsonify({
-            "message": "Unable to save patient"
-        }), 500
+        return jsonify({"message": "Unable to save patient"}), 500
 
 
 # View patients with search and filters
@@ -102,14 +98,14 @@ def get_patients():
     if status:
         query = query.filter_by(status=status)
 
-    patients = query.order_by(
-        Patient.id.desc()
-    ).all()
+    patients = query.order_by(Patient.id.desc()).all()
 
-    return jsonify({
-        "count": len(patients),
-        "patients": [patient.to_dict() for patient in patients]
-    })
+    return jsonify(
+        {
+            "count": len(patients),
+            "patients": [patient.to_dict() for patient in patients],
+        }
+    )
 
 
 # Edit a patient
@@ -124,10 +120,7 @@ def update_patient(patient_id):
     cleaned, errors = validate_patient_data(data)
 
     if errors:
-        return jsonify({
-            "message": "Validation failed",
-            "errors": errors
-        }), 400
+        return jsonify({"message": "Validation failed", "errors": errors}), 400
 
     for field, value in cleaned.items():
         setattr(patient, field, value)
@@ -135,16 +128,13 @@ def update_patient(patient_id):
     try:
         db.session.commit()
 
-        return jsonify({
-            "message": "Patient updated successfully",
-            "patient": patient.to_dict()
-        })
+        return jsonify(
+            {"message": "Patient updated successfully", "patient": patient.to_dict()}
+        )
 
     except Exception:
         db.session.rollback()
-        return jsonify({
-            "message": "Unable to update patient"
-        }), 500
+        return jsonify({"message": "Unable to update patient"}), 500
 
 
 # Delete a patient
@@ -159,15 +149,11 @@ def delete_patient(patient_id):
         db.session.delete(patient)
         db.session.commit()
 
-        return jsonify({
-            "message": "Patient deleted successfully"
-        })
+        return jsonify({"message": "Patient deleted successfully"})
 
     except Exception:
         db.session.rollback()
-        return jsonify({
-            "message": "Unable to delete patient"
-        }), 500
+        return jsonify({"message": "Unable to delete patient"}), 500
 
 
 # Discharge a patient
@@ -179,25 +165,20 @@ def discharge_patient(patient_id):
         return jsonify({"message": "Patient not found"}), 404
 
     if patient.status == "Discharged":
-        return jsonify({
-            "message": "Patient is already discharged"
-        }), 400
+        return jsonify({"message": "Patient is already discharged"}), 400
 
     patient.status = "Discharged"
 
     try:
         db.session.commit()
 
-        return jsonify({
-            "message": "Patient discharged successfully",
-            "patient": patient.to_dict()
-        })
+        return jsonify(
+            {"message": "Patient discharged successfully", "patient": patient.to_dict()}
+        )
 
     except Exception:
         db.session.rollback()
-        return jsonify({
-            "message": "Unable to discharge patient"
-        }), 500
+        return jsonify({"message": "Unable to discharge patient"}), 500
 
 
 if __name__ == "__main__":
